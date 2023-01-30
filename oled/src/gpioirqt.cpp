@@ -1,26 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <time.h>
-#include <iostream>
-#ifndef _IRQ_CPP_
-#define _IRQ_CPP_
-using namespace std;
- /****************************************************************
- * Constants
- ****************************************************************/
+#include "gpioirqt.h"
 
 #define SYSFS_GPIO_DIR "/sys/class/gpio"
 #define POLL_TIMEOUT (3 * 1000) /* 3 seconds */
 #define MAX_BUF 64
+#define DEBOUNCE_TIME 0
 
-/****************************************************************
- * gpio_export
- ****************************************************************/
+using namespace std;
+
 int gpio_export(unsigned int gpio)
 {
 	int fd, len;
@@ -191,35 +177,39 @@ int gpio_fd_close(int fd)
 /****************************************************************
  * Main
  ****************************************************************/
-int start_irq(int argv, int (*fcnPtr)(Display&), Display &disp)
+int start_irq(int gpionum[],int gpionumSize, void (*update)())
 {
-	struct pollfd fdset[2];
-	int nfds = 2;
-	int gpio_fd, timeout, rc;
+	struct pollfd fdset[gpionumSize + 1];
+	int nfds = gpionumSize + 1;
+	int gpio_fd[gpionumSize], timeout, rc;
 	char *buf[MAX_BUF];
-	unsigned int gpio;
+	unsigned int gpio[gpionumSize];
 	int len;
 	int val;
+  for(int i = 0; i < gpionumSize; i++){
+    gpio[i] = gpionum[i];
+    gpio_export(gpio[i]);
+  	gpio_set_dir(gpio[i], 0);
+  	gpio_set_edge(gpio[i], "both");
+  	gpio_fd[i] = gpio_fd_open(gpio[i]);
+  }
 
-	gpio = argv;
-
-	gpio_export(gpio);
-	gpio_set_dir(gpio, 0);
-	gpio_set_edge(gpio, "falling");
-	gpio_fd = gpio_fd_open(gpio);
 
 	timeout = POLL_TIMEOUT;
 
 	time_t last_interrupt_time = 0;
 	time_t interrupt_time = time(NULL);
+
 	while (1) {
 		memset((void*)fdset, 0, sizeof(fdset));
 
-		fdset[0].fd = STDIN_FILENO;
-		fdset[0].events = POLLIN;
+		// fdset[0].fd = STDIN_FILENO;								//interrupt init for command line
+		// fdset[0].events = POLLIN;
 
-		fdset[1].fd = gpio_fd;
-		fdset[1].events = POLLPRI;
+    for(int i = 0; i < gpionumSize; i++){			//interrupts init for all gpio
+      fdset[i].fd = gpio_fd[i];
+  		fdset[i].events = POLLPRI;
+    }
 
 		rc = poll(fdset, nfds, timeout);
 
@@ -232,34 +222,33 @@ int start_irq(int argv, int (*fcnPtr)(Display&), Display &disp)
 			printf(".");
 		}
 
-		if (fdset[1].revents & POLLPRI) {
-			lseek(fdset[1].fd, 0, SEEK_SET);
-			len = read(fdset[1].fd, buf, MAX_BUF);
-		  // If interrupts come faster than 200ms, assume it's a bounce and ignore
-			time_t interrupt_time = time(NULL);
-			float difftime = interrupt_time - last_interrupt_time;
-			if (difftime > 1)
-		  {
-				//printf("\npoll() GPIO %d interrupt occurred\n", gpio);
-				//printf("\tread value: '%c'\n", buf[0]);
-				//printf("%f \n",interrupt_time-last_interrupt_time);
-				last_interrupt_time = interrupt_time;
-        fcnPtr(disp);
-		  }
-			//printf("%i\n",difftime);
-		  //last_interrupt_time = interrupt_time;
+    for(int i = 0; i < gpionumSize; i++){
+      if (fdset[i].revents & POLLPRI) {
+        lseek(fdset[i].fd, 0, SEEK_SET);
+        len = read(fdset[i].fd, buf, MAX_BUF);
+				//printf("succeess interrupt\n");
+				update();
+        	// If interrupts come faster than 200ms, assume it's a bounce and ignore
+        	// time_t interrupt_time = time(NULL); //johoho
+          //printf("\npoll() GPIO %i interrupt occurred\n", gpio[i]);
+          //printf("\tread value: '%c'\n", buf[0]);
+          //last_interrupt_time = interrupt_time;
+          //fcnPtr(disp);
+        //printf("%i\n",difftime);
+        //last_interrupt_time = interrupt_time;
+      }
+    }
 
-		}
-		
-		if (fdset[0].revents & POLLIN) {
-			(void)read(fdset[0].fd, buf, 1);
-			printf("\npoll() stdin read 0x%2.2X\n", (unsigned int) buf[0]);
-		}
-
+		// if (fdset[0].revents & POLLIN) {
+		// 	(void)read(fdset[0].fd, buf, 1);
+		// 	//printf("\npoll() stdin read 0x%2.2X\n", (unsigned int) buf[0]);
+		// }
 		fflush(stdout);
 	}
 
-	gpio_fd_close(gpio_fd);
+  for (int i = 0; i < gpionumSize; i++){
+    gpio_fd_close(gpio_fd[i]);
+  }
+
 	return 0;
 }
-#endif

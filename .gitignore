@@ -1,3 +1,5 @@
+*.exe
+build/
 build-*/
 *.pro.user
 Makefile*
@@ -21,3 +23,5 @@ ui_*
 *.hex
 *.a
 *.out
+.vscode/
+cmake_install.cmake
