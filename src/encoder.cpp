@@ -152,25 +152,5 @@ Key::Key(char _pin){
 }
 
 unsigned char Key::process() {
-  unsigned char pinstate = Gpio::digitalRead(pin);
-  state = pinstate;
-  return pinstate;
+  return Gpio::digitalRead(pin);
 }
-
-// int main(){                              //example programm
-//   Rotary rotary = Rotary(6,8);
-//
-//   int counter = 0;
-//   while(1){
-//     unsigned char result = rotary.process();
-//     if (result == DIR_CW) {
-//       counter++;
-//       printf("%i \n", counter);
-//     } else if (result == DIR_CCW) {
-//       counter--;
-//       printf("%i \n", counter);
-//     }
-//   }
-//
-//
-// }
