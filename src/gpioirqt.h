@@ -10,7 +10,7 @@
 #include <poll.h>
 #include <time.h>
 #include <iostream>
-//#include "display.h"
+#include <functional>
 
 // Constants
 
@@ -28,8 +28,6 @@ int gpio_set_edge(unsigned int gpio, char *edge);
 int gpio_fd_open(unsigned int gpio);
 int gpio_fd_close(int fd);
 
-
-int start_irq(int gpionum[],int gpionumSize,void(*update)()); // just use this
-
+int start_irq(int gpionum[],int gpionumSize, std::function<void()> update); // just use this
 
 #endif

@@ -1,10 +1,5 @@
 #include "gpioirqt.h"
 
-#define SYSFS_GPIO_DIR "/sys/class/gpio"
-#define POLL_TIMEOUT (3 * 1000) /* 3 seconds */
-#define MAX_BUF 64
-#define DEBOUNCE_TIME 0
-
 using namespace std;
 
 int gpio_export(unsigned int gpio)
@@ -177,7 +172,7 @@ int gpio_fd_close(int fd)
 /****************************************************************
  * Main
  ****************************************************************/
-int start_irq(int gpionum[],int gpionumSize, void (*update)())
+int start_irq(int gpionum[],int gpionumSize, std::function<void()> update)
 {
 	struct pollfd fdset[gpionumSize + 1];
 	int nfds = gpionumSize + 1;
